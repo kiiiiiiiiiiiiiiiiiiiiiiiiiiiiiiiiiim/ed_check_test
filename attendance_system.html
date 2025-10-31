@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR 출석 시스템</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 15px 30px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* 관리자 페이지 */
+        .schedule-grid {
+            display: grid;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .day-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            border-left: 5px solid #667eea;
+        }
+
+        .day-header {
+            font-size: 1.3em;
+            color: #667eea;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .lecture-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .lecture-info {
+            flex: 1;
+        }
+
+        .lecture-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .lecture-time {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .lecture-location {
+            color: #999;
+            font-size: 0.85em;
+            margin-top: 3px;
+        }
+
+        .qr-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .qr-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        /* QR 코드 모달 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-content h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        #qrcode {
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            display: inline-block;
+        }
+
+        .close-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+            font-size: 16px;
+        }
+
+        /* 학생 출석 체크 */
+        .attendance-form {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #reader {
+            margin: 20px 0;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .submit-btn:hover {
+            background: #5568d3;
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* 출석부 */
+        .attendance-table-container {
+            overflow-x: auto;
+        }
+
+        .attendance-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .attendance-table th {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        .attendance-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .attendance-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-present {
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .status-absent {
+            color: #f44336;
+            font-weight: bold;
+        }
+
+        .status-late {
+            color: #ff9800;
+            font-weight: bold;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group select {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .export-btn {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📚 QR 출석 시스템</h1>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('admin')">관리자</button>
+            <button class="tab" onclick="switchTab('student')">학생 출석</button>
+            <button class="tab" onclick="switchTab('records')">출석부</button>
+        </div>
+
+        <!-- 관리자 탭 -->
+        <div id="admin" class="tab-content active">
+            <h2>📅 교육 일정 및 QR 코드 생성</h2>
+            <div class="schedule-grid" id="scheduleGrid"></div>
+        </div>
+
+        <!-- 학생 출석 체크 탭 -->
+        <div id="student" class="tab-content">
+            <div class="attendance-form">
+                <h2>✅ 출석 체크</h2>
+                <div id="studentAlert"></div>
+                
+                <div class="form-group">
+                    <label for="studentName">이름</label>
+                    <input type="text" id="studentName" placeholder="이름을 입력하세요" required>
+                </div>
+
+                <div class="form-group">
+                    <label>QR 코드 스캔</label>
+                    <div id="reader"></div>
+                </div>
+
+                <button class="submit-btn" id="manualCheckBtn" onclick="manualAttendance()">수동 출석 체크</button>
+            </div>
+        </div>
+
+        <!-- 출석부 탭 -->
+        <div id="records" class="tab-content">
+            <h2>📋 출석부</h2>
+            
+            <div class="stats-grid" id="statsGrid"></div>
+
+            <div class="filter-group">
+                <select id="filterDay" onchange="filterAttendance()">
+                    <option value="">전체 날짜</option>
+                    <option value="1">1일차</option>
+                    <option value="2">2일차</option>
+                    <option value="3">3일차</option>
+                    <option value="4">4일차</option>
+                    <option value="5">5일차</option>
+                </select>
+
+                <select id="filterSubject" onchange="filterAttendance()">
+                    <option value="">전체 과목</option>
+                    <option value="웹 프로그래밍 기초">웹 프로그래밍 기초</option>
+                    <option value="데이터베이스 설계">데이터베이스 설계</option>
+                    <option value="UI/UX 디자인">UI/UX 디자인</option>
+                    <option value="프로젝트 관리">프로젝트 관리</option>
+                    <option value="팀 협업 실습">팀 협업 실습</option>
+                </select>
+
+                <button class="export-btn" onclick="exportToCSV()">📥 CSV 다운로드</button>
+            </div>
+
+            <div class="attendance-table-container">
+                <table class="attendance-table" id="attendanceTable">
+                    <thead>
+                        <tr>
+                            <th>날짜</th>
+                            <th>강좌명</th>
+                            <th>수강생</th>
+                            <th>출석 시간</th>
+                            <th>출결 상태</th>
+                            <th>위치 확인</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR 코드 모달 -->
+    <div class="modal" id="qrModal">
+        <div class="modal-content">
+            <h2 id="modalTitle">QR 코드</h2>
+            <p id="modalInfo"></p>
+            <div id="qrcode"></div>
+            <button class="close-btn" onclick="closeModal()">닫기</button>
+        </div>
+    </div>
+
+    <script>
+        // 교육 일정 데이터
+        const schedule = [
+            {
+                day: 1,
+                date: '2024-11-01',
+                lectures: [
+                    { subject: '웹 프로그래밍 기초', time: '09:00-12:00', location: '101호', lat: 37.5665, lng: 126.9780 }
+                ]
+            },
+            {
+                day: 2,
+                date: '2024-11-02',
+                lectures: [
+                    { subject: '데이터베이스 설계', time: '09:00-12:00', location: '102호', lat: 37.5665, lng: 126.9780 }
+                ]
+            },
+            {
+                day: 3,
+                date: '2024-11-03',
+                lectures: [
+                    { subject: 'UI/UX 디자인', time: '09:00-12:00', location: '103호', lat: 37.5665, lng: 126.9780 }
+                ]
+            },
+            {
+                day: 4,
+                date: '2024-11-04',
+                lectures: [
+                    { subject: '프로젝트 관리', time: '09:00-12:00', location: '104호', lat: 37.5665, lng: 126.9780 }
+                ]
+            },
+            {
+                day: 5,
+                date: '2024-11-05',
+                lectures: [
+                    { subject: '팀 협업 실습', time: '09:00-12:00', location: '105호', lat: 37.5665, lng: 126.9780 }
+                ]
+            }
+        ];
+
+        // 출석 기록 저장
+        let attendanceRecords = JSON.parse(localStorage.getItem('attendanceRecords')) || [];
+        
+        // 장치 고유 ID 생성 (브라우저 fingerprint)
+        function getDeviceId() {
+            let deviceId = localStorage.getItem('deviceId');
+            if (!deviceId) {
+                // 고유 ID 생성 (랜덤 + 타임스탬프)
+                deviceId = 'device_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                localStorage.setItem('deviceId', deviceId);
+            }
+            return deviceId;
+        }
+
+        // QR 스캐너 인스턴스
+        let html5QrCode = null;
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            renderSchedule();
+            renderAttendanceTable();
+            updateStats();
+            initQRScanner();
+        });
+
+        // 일정 렌더링
+        function renderSchedule() {
+            const grid = document.getElementById('scheduleGrid');
+            grid.innerHTML = '';
+
+            schedule.forEach(day => {
+                const dayCard = document.createElement('div');
+                dayCard.className = 'day-card';
+                
+                let lecturesHTML = '';
+                day.lectures.forEach((lecture, index) => {
+                    lecturesHTML += `
+                        <div class="lecture-item">
+                            <div class="lecture-info">
+                                <div class="lecture-title">${lecture.subject}</div>
+                                <div class="lecture-time">⏰ ${lecture.time}</div>
+                                <div class="lecture-location">📍 ${lecture.location}</div>
+                            </div>
+                            <button class="qr-btn" onclick="generateQR(${day.day}, ${index})">
+                                QR 생성
+                            </button>
+                        </div>
+                    `;
+                });
+
+                dayCard.innerHTML = `
+                    <div class="day-header">${day.day}일차 (${day.date})</div>
+                    ${lecturesHTML}
+                `;
+
+                grid.appendChild(dayCard);
+            });
+        }
+
+        // QR 코드 생성
+        function generateQR(day, lectureIndex) {
+            const dayData = schedule[day - 1];
+            const lecture = dayData.lectures[lectureIndex];
+            
+            const qrData = {
+                day: day,
+                date: dayData.date,
+                subject: lecture.subject,
+                time: lecture.time,
+                location: lecture.location,
+                lat: lecture.lat,
+                lng: lecture.lng,
+                timestamp: new Date().getTime()
+            };
+
+            document.getElementById('modalTitle').textContent = `${lecture.subject} QR 코드`;
+            document.getElementById('modalInfo').textContent = `${day}일차 | ${lecture.time} | ${lecture.location}`;
+            
+            document.getElementById('qrcode').innerHTML = '';
+            QRCode.toCanvas(document.createElement('canvas'), JSON.stringify(qrData), {
+                width: 300,
+                margin: 2
+            }, function(error, canvas) {
+                if (error) {
+                    console.error(error);
+                    return;
+                }
+                document.getElementById('qrcode').appendChild(canvas);
+            });
+
+            document.getElementById('qrModal').classList.add('active');
+        }
+
+        // 모달 닫기
+        function closeModal() {
+            document.getElementById('qrModal').classList.remove('active');
+        }
+
+        // QR 스캐너 초기화
+        function initQRScanner() {
+            const config = { 
+                fps: 10, 
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0
+            };
+
+            html5QrCode = new Html5Qrcode("reader");
+            
+            // 카메라 시작은 탭이 활성화될 때만
+            document.querySelector('[onclick*="student"]').addEventListener('click', startScanner);
+        }
+
+        function startScanner() {
+            if (html5QrCode && !html5QrCode.isScanning) {
+                html5QrCode.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    onScanSuccess,
+                    onScanError
+                ).catch(err => {
+                    console.log("카메라 시작 실패:", err);
+                });
+            }
+        }
+
+        // QR 스캔 성공
+        function onScanSuccess(decodedText, decodedResult) {
+            try {
+                const qrData = JSON.parse(decodedText);
+                processAttendance(qrData);
+            } catch (e) {
+                showAlert('error', '유효하지 않은 QR 코드입니다.');
+            }
+        }
+
+        function onScanError(errorMessage) {
+            // 스캔 에러는 무시 (계속 스캔)
+        }
+
+        // 출석 처리
+        function processAttendance(qrData) {
+            const studentName = document.getElementById('studentName').value.trim();
+            
+            if (!studentName) {
+                showAlert('error', '이름을 입력해주세요.');
+                return;
+            }
+
+            // 위치 확인
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const distance = calculateDistance(
+                            position.coords.latitude,
+                            position.coords.longitude,
+                            qrData.lat,
+                            qrData.lng
+                        );
+
+                        // 500m 이내만 출석 인정
+                        if (distance > 0.5) {
+                            showAlert('error', '출석 가능한 위치가 아닙니다. (거리: ' + distance.toFixed(2) + 'km)');
+                            return;
+                        }
+
+                        // 시간 확인
+                        const [startTime, endTime] = qrData.time.split('-');
+                        const now = new Date();
+                        const currentTime = now.getHours() * 60 + now.getMinutes();
+                        const [startHour, startMin] = startTime.split(':').map(Number);
+                        const [endHour, endMin] = endTime.split(':').map(Number);
+                        const classStart = startHour * 60 + startMin;
+                        const classEnd = endHour * 60 + endMin;
+
+                        let status = '출석';
+                        if (currentTime < classStart) {
+                            showAlert('error', '아직 출석 시간이 아닙니다.');
+                            return;
+                        } else if (currentTime > classEnd) {
+                            showAlert('error', '출석 시간이 종료되었습니다.');
+                            return;
+                        } else if (currentTime > classStart + 10) {
+                            status = '지각';
+                        }
+
+                        // 장치 ID 가져오기
+                        const deviceId = getDeviceId();
+                        
+                        // 중복 출석 확인 1: 같은 이름으로 이미 출석했는지
+                        const duplicateName = attendanceRecords.find(r => 
+                            r.name === studentName && 
+                            r.day === qrData.day && 
+                            r.subject === qrData.subject
+                        );
+
+                        if (duplicateName) {
+                            showAlert('warning', '이미 출석 처리되었습니다.');
+                            return;
+                        }
+                        
+                        // 중복 출석 확인 2: 같은 장치에서 이미 출석했는지 (대리출석 방지)
+                        const duplicateDevice = attendanceRecords.find(r => 
+                            r.deviceId === deviceId && 
+                            r.day === qrData.day && 
+                            r.subject === qrData.subject
+                        );
+
+                        if (duplicateDevice) {
+                            showAlert('error', `이 기기는 이미 출석 처리되었습니다.\n출석자: ${duplicateDevice.name}\n\n대리 출석은 불가능합니다.`);
+                            return;
+                        }
+
+                        // 출석 기록 저장
+                        const record = {
+                            day: qrData.day,
+                            date: qrData.date,
+                            subject: qrData.subject,
+                            name: studentName,
+                            time: now.toLocaleTimeString('ko-KR'),
+                            status: status,
+                            location: qrData.location,
+                            distance: distance.toFixed(3) + 'km',
+                            timestamp: now.getTime(),
+                            deviceId: deviceId  // 장치 ID 추가
+                        };
+
+                        attendanceRecords.push(record);
+                        localStorage.setItem('attendanceRecords', JSON.stringify(attendanceRecords));
+
+                        showAlert('success', `출석이 완료되었습니다! (${status})`);
+                        renderAttendanceTable();
+                        updateStats();
+
+                        // 입력 초기화
+                        document.getElementById('studentName').value = '';
+                    },
+                    (error) => {
+                        showAlert('error', '위치 정보를 가져올 수 없습니다. 위치 권한을 확인해주세요.');
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                showAlert('error', '이 브라우저는 위치 서비스를 지원하지 않습니다.');
+            }
+        }
+
+        // 수동 출석 (테스트용)
+        function manualAttendance() {
+            const studentName = document.getElementById('studentName').value.trim();
+            
+            if (!studentName) {
+                showAlert('error', '이름을 입력해주세요.');
+                return;
+            }
+
+            // 현재 날짜 기준으로 가장 가까운 강의 찾기
+            const now = new Date();
+            const currentHour = now.getHours();
+            
+            // 오전 9시~12시 사이만 출석 가능
+            if (currentHour < 9 || currentHour >= 12) {
+                showAlert('error', '출석 가능 시간이 아닙니다. (09:00-12:00)');
+                return;
+            }
+
+            // 임시로 1일차 강의로 출석 처리 (실제로는 날짜 비교 필요)
+            const dayData = schedule[0];
+            const lecture = dayData.lectures[0];
+
+            // 장치 ID 가져오기
+            const deviceId = getDeviceId();
+            
+            // 중복 확인
+            const duplicateDevice = attendanceRecords.find(r => 
+                r.deviceId === deviceId && 
+                r.day === dayData.day && 
+                r.subject === lecture.subject
+            );
+
+            if (duplicateDevice) {
+                showAlert('error', `이 기기는 이미 출석 처리되었습니다.\n출석자: ${duplicateDevice.name}\n\n대리 출석은 불가능합니다.`);
+                return;
+            }
+            
+            const record = {
+                day: dayData.day,
+                date: dayData.date,
+                subject: lecture.subject,
+                name: studentName,
+                time: now.toLocaleTimeString('ko-KR'),
+                status: '출석',
+                location: lecture.location,
+                distance: '수동체크',
+                timestamp: now.getTime(),
+                deviceId: deviceId  // 장치 ID 추가
+            };
+
+            attendanceRecords.push(record);
+            localStorage.setItem('attendanceRecords', JSON.stringify(attendanceRecords));
+
+            showAlert('success', '출석이 완료되었습니다!');
+            renderAttendanceTable();
+            updateStats();
+
+            document.getElementById('studentName').value = '';
+        }
+
+        // 거리 계산 (Haversine formula)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // 지구 반지름 (km)
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // 출석부 렌더링
+        function renderAttendanceTable() {
+            const tbody = document.getElementById('attendanceBody');
+            tbody.innerHTML = '';
+
+            const filterDay = document.getElementById('filterDay')?.value;
+            const filterSubject = document.getElementById('filterSubject')?.value;
+
+            let filteredRecords = attendanceRecords;
+
+            if (filterDay) {
+                filteredRecords = filteredRecords.filter(r => r.day == filterDay);
+            }
+
+            if (filterSubject) {
+                filteredRecords = filteredRecords.filter(r => r.subject === filterSubject);
+            }
+
+            // 최신순 정렬
+            filteredRecords.sort((a, b) => b.timestamp - a.timestamp);
+
+            filteredRecords.forEach(record => {
+                const row = document.createElement('tr');
+                const statusClass = record.status === '출석' ? 'status-present' : 
+                                  record.status === '지각' ? 'status-late' : 'status-absent';
+                
+                row.innerHTML = `
+                    <td>${record.day}일차 (${record.date})</td>
+                    <td>${record.subject}</td>
+                    <td>${record.name}</td>
+                    <td>${record.time}</td>
+                    <td class="${statusClass}">${record.status}</td>
+                    <td>${record.distance}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            if (filteredRecords.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#999;">출석 기록이 없습니다.</td></tr>';
+            }
+        }
+
+        // 통계 업데이트
+        function updateStats() {
+            const statsGrid = document.getElementById('statsGrid');
+            const totalRecords = attendanceRecords.length;
+            const presentCount = attendanceRecords.filter(r => r.status === '출석').length;
+            const lateCount = attendanceRecords.filter(r => r.status === '지각').length;
+            const uniqueStudents = new Set(attendanceRecords.map(r => r.name)).size;
+
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${totalRecords}</div>
+                    <div class="stat-label">총 출석 기록</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${presentCount}</div>
+                    <div class="stat-label">정상 출석</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${lateCount}</div>
+                    <div class="stat-label">지각</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${uniqueStudents}</div>
+                    <div class="stat-label">수강생 수</div>
+                </div>
+            `;
+        }
+
+        // 필터링
+        function filterAttendance() {
+            renderAttendanceTable();
+        }
+
+        // CSV 내보내기
+        function exportToCSV() {
+            if (attendanceRecords.length === 0) {
+                alert('출석 기록이 없습니다.');
+                return;
+            }
+
+            let csv = '날짜,강좌명,수강생,출석시간,출결상태,위치확인\n';
+            
+            attendanceRecords.forEach(record => {
+                csv += `${record.day}일차 (${record.date}),${record.subject},${record.name},${record.time},${record.status},${record.distance}\n`;
+            });
+
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `출석부_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        // 알림 표시
+        function showAlert(type, message) {
+            const alertDiv = document.getElementById('studentAlert');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            alertDiv.style.display = 'block';
+
+            setTimeout(() => {
+                alertDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // 탭 전환
+        function switchTab(tabName) {
+            // 모든 탭 비활성화
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            // 선택된 탭 활성화
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+
+            // QR 스캐너 시작/정지
+            if (tabName === 'student') {
+                setTimeout(startScanner, 100);
+            } else if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop();
+            }
+
+            // 출석부 탭일 경우 데이터 갱신
+            if (tabName === 'records') {
+                renderAttendanceTable();
+                updateStats();
+            }
+        }
+
+        // 페이지 나갈 때 카메라 정지
+        window.addEventListener('beforeunload', () => {
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop();
+            }
+        });
+    </script>
+</body>
+</html>
